@@ -27,10 +27,8 @@ PERFT_CASES = [
 
 
 def apply_uci(u):
-    x = 112 * E.sd
-    pr = E.PS.index(u[4]) if len(u) > 4 else 0
-    E.mk((E.U(u[:2]) ^ x) | ((E.U(u[2:4]) ^ x) << 7) | (pr << 14))
-    E.sd ^= 1
+    pr = max(0, E.PS.find(u[4:]))
+    E.mk(E.U(u[:2]) | (E.U(u[2:4]) << 7) | (pr << 14))
 
 
 def is_rep():
@@ -38,7 +36,7 @@ def is_rep():
 
 
 def insufficient_material():
-    return sum(1 + 9 * (p & 7 in (1, 4, 5)) for p in E.b if 0 < p & 7 < 6) < 2
+    return E.ph < 3 and sum(1 + 9 * ((E.b[q] & 7) in (1, 4, 5)) for q in E.Q if 0 < E.b[q] & 7 < 6) < 2
 
 
 def perft(depth):
@@ -67,7 +65,7 @@ def assert_incremental_invariants():
             elif p == 14:
                 bk += 1
     assert wk == 1 and bk == 1, f"King count mismatch: wk={wk}, bk={bk}"
-    assert E.rs[-1] == (bytes(E.b), E.cr, E.ep), "Repetition stack top mismatch"
+    assert E.rs[-1] == E._rk(), "Repetition stack top mismatch"
     assert E.hm >= 0
 
 
@@ -116,19 +114,19 @@ def run_invariants():
 
     E.lf("6k1/5ppp/8/8/8/8/5PPP/4R1K1 w - - 0 1")
     bm, sc = E.sr(10000, 20000)
-    assert E.M(bm, E.sd) == "e1e8", f"Expected e1e8 mate, got {E.M(bm, E.sd)}"
+    assert E.M(bm) == "e1e8", f"Expected e1e8 mate, got {E.M(bm)}"
     assert sc >= E.MATE - 5
-    print(f"  [PASS] Mate-in-1 found ({E.M(bm, E.sd)}, score={sc})")
+    print(f"  [PASS] Mate-in-1 found ({E.M(bm)}, score={sc})")
 
     E.lf("r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4")
     bm, sc = E.sr(10000, 20000)
-    assert E.M(bm, E.sd) == "h5f7", f"Expected h5f7#, got {E.M(bm, E.sd)}"
+    assert E.M(bm) == "h5f7", f"Expected h5f7#, got {E.M(bm)}"
     print("  [PASS] Scholar's mate found")
 
     E.lf("3r2k1/5ppp/8/8/8/8/4QPPP/4R1K1 w - - 0 1")
     bm, sc = E.sr(20000, 40000)
-    assert E.M(bm, E.sd) == "e2e8", f"Expected e2e8 (M2), got {E.M(bm, E.sd)}"
-    print(f"  [PASS] Mate-in-2 found ({E.M(bm, E.sd)}, score={sc})")
+    assert E.M(bm) == "e2e8", f"Expected e2e8 (M2), got {E.M(bm)}"
+    print(f"  [PASS] Mate-in-2 found ({E.M(bm)}, score={sc})")
 
     E.lf("6k1/8/6K1/8/8/8/8/6R1 w - - 0 1")
     for um in ("g1h1", "g8f8", "h1g1", "f8g8"):
@@ -179,7 +177,7 @@ def run_determinism():
         "import json, sys; sys.path.insert(0, '.'); import engine_src as E; "
         "out = []; "
         f"fens = {fens!r}; "
-        "[E.lf(f) or out.append((E.M(E.sr(30000, 60000)[0], E.sd), E.nd)) for f in fens]; "
+        "[E.lf(f) or out.append((E.M(E.sr(30000, 60000)[0]), E.nd)) for f in fens]; "
         "print(json.dumps(out))"
     )
     env_a = dict(os.environ, PYTHONHASHSEED="1")
@@ -203,31 +201,37 @@ def run_bench():
         E.lf(fen)
         E.tt.clear()
         t0 = time.perf_counter()
-        bm, sc = E.sr(50000, 50000)
+        bm, sc = E.sr(80000, 120000)
         dt = time.perf_counter() - t0
         nps = E.nd / max(dt, 1e-6)
         worst_nps = min(worst_nps, nps)
-        print(f"  {name:14s}: {E.nd:6d} nodes in {dt:.3f}s -> {nps:,.0f} NPS (move={E.M(bm, E.sd)}, sc={sc})")
-    b_base = int(2.5 * worst_nps * 0.8)
-    b_hard = int(5.0 * worst_nps * 0.8)
+        print(f"  {name:14s}: {E.nd:6d} nodes in {dt:.3f}s -> {nps:,.0f} NPS (move={E.M(bm)}, sc={sc})")
+    b_base = int(2.0 * worst_nps)
+    b_hard = int(4.0 * worst_nps)
     print(f"  Worst NPS = {worst_nps:,.0f} -> Recommended B_BASE={b_base}, B_HARDCAP={b_hard}")
 
 
 def run_size():
-    print("=== Gate 5: lzma Packed Size Gate ===")
+    print("=== Gate 5: makefun compress Packed Size Gate ===")
     src_path = os.path.join(REPO_ROOT, "engine_src.py")
     with open(src_path, "rb") as f:
         raw = f.read()
-    comp = lzma.compress(raw, preset=9)
-    stub = b"import lzma,base64;exec(lzma.decompress(base64.b85decode(" + repr(
-        base64.b85encode(comp).decode()
-    ).encode() + b")))\n"
-    total = len(stub)
+    kit_cli = "/tmp/kit/tiny-chess-01-kit/cli/makefun.mjs"
+    if os.path.exists(kit_cli):
+        tmp_out = os.path.join(REPO_ROOT, ".tmp_packed_check.py")
+        env = dict(os.environ, MAKEFUN_COMPRESS_STATE="/tmp/compress_check.json")
+        subprocess.run(["node", kit_cli, "compress", "engine_src.py", "--out", ".tmp_packed_check.py"], cwd=REPO_ROOT, env=env, check=True, capture_output=True)
+        total = os.path.getsize(tmp_out)
+        os.remove(tmp_out)
+    else:
+        comp = lzma.compress(raw, preset=9)
+        stub = b"import lzma,base64;exec(lzma.decompress(base64.b85decode(" + repr(base64.b85encode(comp).decode()).encode() + b")))\n"
+        total = len(stub)
     print(f"  Source size : {len(raw):,} B")
     print(f"  Packed size : {total:,} B (target <= 3,950 B, hard cap <= 4,096 B)")
     assert total <= 4096, f"Packed size {total} exceeds 4,096 B hard cap!"
     if total > 3950:
-        print("  [WARN] Packed size > 3,950 B target; consider byte-trim order")
+        print("  [WARN] Packed size > 3,950 B target; trim source bytes")
     else:
         print("  [PASS] Packed size within 3,950 B target!")
 
@@ -277,7 +281,7 @@ def run_strength():
     for name, fen, expected in puzzles:
         E.lf(fen)
         bm, sc = E.sr(25000, 50000)
-        uci = E.M(bm, E.sd)
+        uci = E.M(bm)
         if expected:
             assert uci in expected, f"Puzzle {name} failed: got {uci}, expected {expected}"
         print(f"  [PASS] {name:16s} -> {uci} (score={sc})")
@@ -288,11 +292,11 @@ def run_strength():
     ]
     pts = 0.0
     games = 0
+    sm = (0, 1, 3, 3, 5, 9, 0)
     for op in openings:
         for our_color in (0, 1):
             E.lf(op)
             E.tt.clear()
-            E.kl = [0] * 128
             plies = 0
             res = 0.5
             while plies < 140:
@@ -306,15 +310,15 @@ def run_strength():
                 if int(E.sd) == our_color:
                     E.gp = plies
                     bm, _ = E.sr(20000, 40000)
-                    uci = E.M(bm, E.sd)
+                    uci = E.M(bm)
                 else:
                     bm = pick_baseline_move(depth=3)
-                    uci = E.M(bm, E.sd)
+                    uci = E.M(bm)
                 apply_uci(uci)
                 plies += 1
             else:
-                md = sum(E.SM[p & 7] * (1 if p < 8 else -1) for p in E.b if 0 < p & 7 < 6)
-                if int(E.sd) != our_color:
+                md = sum(sm[p & 7] * (1 if p < 8 else -1) for p in E.b if 0 < p & 7 < 6)
+                if our_color == 1:
                     md = -md
                 res = 1.0 if md >= 5 else (0.0 if md <= -5 else 0.5)
             pts += res
