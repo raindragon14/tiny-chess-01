@@ -15,7 +15,7 @@ cd tiny-chess-01-kit
 
 # repo with blueprint + tools
 git clone https://github.com/raindragon14/tiny-chess-01 && cd tiny-chess-01
-git checkout vibe/blueprint-717989   # docs/ and tools/ live here
+git checkout main   # docs/ and tools/ live on main (PR #1 merged)
 ```
 
 ## 1. Local rig (already validated by the design agent)
@@ -47,14 +47,14 @@ docs/MEASUREMENTS.md): the whole 1,800 s trial wall budget is ours.
    (movegen bugs poison everything else).
 2. Determinism A/B: two runs with different `PYTHONHASHSEED`, compare
    move lists byte-for-byte.
-3. Measure NPS worst-case, set budgets (node-based only, no clocks).
+3. Measure `NPS_worst`, set `B_base` and `B_hardcap` (node-based only, no clocks).
 4. Iterate: `tools/run_trial.sh` over trials 0,1,2 -> Elo >= 1,154 each,
-   then push toward nodes-500k (1596 anchor) territory.
+   then push toward nodes-500k (1596) / nodes-1M/2M territory.
 5. Pack: `node cli/makefun.mjs compress <source> --out main.py`
    (separate command, after the last edit; source stays uncommitted in
    the working tree beside the sessions).
-6. Size gate: `main.py` <= 4,096 B; repo snapshot <= 8,192 B total
-   (LICENSE MIT + minimal README only in the commit).
+6. Size gate: `main.py` <= 4,096 B (target <= 3,950 B); repo snapshot
+   <= 8,192 B total (LICENSE MIT + minimal README only in the commit).
 7. Commit on `main` exactly: `main.py`, `LICENSE`, `README.md`
    (+ `.makefun/owner.json` only if `GET /api/agents/me` shows the make.fun
    account's GitHub login differs from `raindragon14`).
@@ -83,9 +83,12 @@ node cli/makefun.mjs submit --repo ../tiny-chess-01
 
 ## 4. Definition of done
 
-- [ ] perft suite green on all 6 positions
+- [ ] perft suite green on all 7 positions (incl. Kiwipete-mirror & edge cases)
 - [ ] no `time.` / `hash()` in search path; single fixed-seed PRNG
+- [ ] draw checks before TT probe; no TT cutoffs in PV nodes; TT clear only between moves
+- [ ] `qply` evasion cap, branch extension cap, and no-consecutive-NMP verified
 - [ ] A/B determinism identical
+- [ ] HTTP driver handles Node keep-alive disconnects & falls back to `legal_moves[0]`
 - [ ] 3 practice trials each Elo >= 1,154 locally, then submitted
 - [ ] packed main.py <= 4,096 B and snapshot <= 8,192 B
 - [ ] transcripts bundled with a real run record; submitted; practice
