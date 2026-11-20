@@ -1,5 +1,5 @@
 import json as J,os as O,urllib.request as R
-MATE,INF,BB,BH=30000,32000,52000,104000
+MATE,INF,BB,BH=30000,32000,54000,108000
 SF="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 FM=" PNBRQK  pnbrqk";PS="..nbrq";PW=(0,0,1,1,2,4,0);MV=(0,82,337,365,477,1025,0);EV=(0,94,281,297,512,936,0)
 BO=(-17,-15,15,17);RO=(-16,-1,1,16);KO=BO+RO;OFF=(0,0,(-33,-31,-18,-14,14,18,31,33),BO,RO,KO,KO)
@@ -106,7 +106,7 @@ def lm():
  return o
 def ev():
  p=min(ph,24);bp=(b.count(3)>1)-(b.count(11)>1);v=ps+32768;m_s=(v>>16)+30*bp;e_s=(v&65535)-32768+50*bp;sc=int((m_s*p+e_s*(24-p))/24)
- if p<7 and abs(e_s)>349:k=ks[e_s>0];sc+=(max(abs(2*(k>>4)-7),abs(2*(k&7)-7))*5+(14-abs((ks[0]>>4)-(ks[1]>>4))-abs((ks[0]&7)-(ks[1]&7)))*4)*((e_s>0)*2-1)
+ if abs(e_s)>250:k=ks[e_s>0];sc+=(max(abs(2*(k>>4)-7),abs(2*(k&7)-7))*5+(14-abs((ks[0]>>4)-(ks[1]>>4))-abs((ks[0]&7)-(ks[1]&7)))*4+(24-p)*3)*((e_s>0)*2-1)
  if gp>149:sc+=max(-80,min(80,e_s//5))
  return(sc if sd<1 else -sc)+12
 def _m(v,y):return v+y*(v>29000)-y*(v<-29000)
@@ -115,7 +115,7 @@ def _n(d,a,b_,y,pv,an=1,k=-1):
  if nd>=bg:raise _A
  if y and(hm>99 or(ph<3 and sum(1+9*((b[q]&7)in(1,4,5))for q in Q if 0<b[q]&7<6)<2)or rs[-1]in rs[-3::-2][:hm//2]):return dw
  if k<0:k=ic()
- d+=k and 0<d<8 and y<24;qs=d<1;se=ev()if not k else -INF
+ d+=k and 0<=d<8 and y<24;qs=d<1;se=ev()if not k else -INF
  if qs:
   if not k:
    if se>=b_:return b_
@@ -135,7 +135,7 @@ def _n(d,a,b_,y,pv,an=1,k=-1):
    if sc>=b_:return b_ if sc<29000 else sc
  if not qs and d>3 and not tm:d-=1
  oa=a;bm2=0;bs=a if qs else -INF;lg=0;k1=kl[y];tm2=(tm or bm*(y<1))*(not qs);qm=qs and not k;mv=gm(qm);hs=sd<<14;G=ht.get
- mv.sort(key=lambda m:-(9e7*(m==tm2)or(5e7+(b[m>>7&127]&7)*9-(b[m&127]&7)+(m>>14)*2 if b[m>>7&127]or m>16383 else(4e7 if m==k1 else G(hs|m,0)))))
+ mv.sort(key=lambda m:-(9e7*(m==tm2)or(5e7+MV[b[m>>7&127]&7]*10-MV[b[m&127]&7]+(m>>14)*200 if b[m>>7&127]or m>16383 else(4e7 if m==k1 else G(hs|m,0)))))
  ll=3+d*d
  for m in mv:
   pr=m>>14;t=m>>7&127;cp=b[t];iq=not(cp or pr or(b[m&127]&7==1 and t==ep))
@@ -171,18 +171,11 @@ def sr(ba=BB,bh=BH):
  if len(lg)<2:return(lg[0]if lg else 0),0
  if len(tt)>5e5:tt.clear()
  if len(ht)>5e4:ht.clear()
- lg4=len(lg)>4;kl=[0]*99;re=ev();dw=-25*(re>40)+25*(re<-40);bg=min(bh,ba*(lg4+1)>>((gp>120)*lg4));bm=lg[0];bs=0;s0=(b[:],ks[:],rs[:],sd,cr,ep,hm,ps,ph)
+ lg4=len(lg)>4;kl=[0]*99;re=ev();dw=-max(-500,min(500,re*2//3));bg=min(bh,ba*(lg4+1)>>((gp>120)*lg4));bm=lg[0];bs=0;s0=(b[:],ks[:],rs[:],sd,cr,ep,hm,ps,ph)
  for d in range(1,64):
   if d>1 and nd>=bg>>1:break
-  a,b_=(bs-35,bs+35)if d>3 and abs(bs)<29000 else(-INF,INF);bb4=bm
-  try:
-   sc=_n(d,a,b_,0,1,1,-1)
-   if sc<=a or sc>=b_:sc=_n(d,-INF,INF,0,1,1,-1)
-   bs=sc
-  except _A:
-   b,ks,rs,sd,cr,ep,hm,ps,ph=s0
-   if b_<INF:bm=bb4
-   return bm,bs
+  try:bs=_n(d,-INF,INF,0,1,1,-1)
+  except _A:b,ks,rs,sd,cr,ep,hm,ps,ph=s0;return bm,bs
   if abs(bs)>29000:break
  return bm,bs
 def main():
